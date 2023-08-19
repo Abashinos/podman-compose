@@ -44,6 +44,7 @@ setup(
             "flake8",
             "black",
             "pylint",
+            "pytest",
             "pre-commit",
         ]
     }

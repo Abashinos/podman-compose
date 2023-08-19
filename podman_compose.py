@@ -204,7 +204,7 @@ def parse_short_mount(mount_str, basedir):
 # unless it's anonymous-volume
 
 
-def fix_mount_dict(compose, mount_dict, proj_name, srv_name):
+def fix_mount_dict(compose: "PodmanCompose", mount_dict, proj_name, srv_name):
     """
     in-place fix mount dictionary to:
     - define _vol to be the corresponding top-level volume
@@ -371,7 +371,7 @@ def transform(args, project_name, given_containers):
     return pods, containers
 
 
-def assert_volume(compose, mount_dict):
+def assert_volume(compose: "PodmanCompose", mount_dict):
     """
     inspect volume to get directory
     create volume if needed
@@ -513,7 +513,7 @@ def mount_desc_to_volume_args(
     return args
 
 
-def get_mnt_dict(compose, cnt, volume):
+def get_mnt_dict(compose: "PodmanCompose", cnt, volume):
     proj_name = compose.project_name
     srv_name = cnt["_service"]
     basedir = compose.dirname
@@ -522,7 +522,7 @@ def get_mnt_dict(compose, cnt, volume):
     return fix_mount_dict(compose, volume, proj_name, srv_name)
 
 
-def get_mount_args(compose, cnt, volume):
+def get_mount_args(compose: "PodmanCompose", cnt, volume):
     volume = get_mnt_dict(compose, cnt, volume)
     # proj_name = compose.project_name
     srv_name = cnt["_service"]
@@ -710,7 +710,7 @@ def norm_ports(ports_in):
     return ports_out
 
 
-def assert_cnt_nets(compose, cnt):
+def assert_cnt_nets(compose: "PodmanCompose", cnt):
     """
     create missing networks
     """
@@ -780,7 +780,7 @@ def assert_cnt_nets(compose, cnt):
             compose.podman.output([], "network", ["exists", net_name])
 
 
-def get_net_args(compose, cnt):
+def get_net_args(compose: "PodmanCompose", cnt):
     service_name = cnt["service_name"]
     net_args = []
     mac_address = cnt.get("mac_address", None)
@@ -898,7 +898,7 @@ def get_net_args(compose, cnt):
     return net_args
 
 
-def container_to_args(compose, cnt, detached=True):
+def container_to_args(compose: "PodmanCompose", cnt, detached=True):
     # TODO: double check -e , --add-host, -v, --read-only
     dirname = compose.dirname
     pod = cnt.get("pod", None) or ""
@@ -1143,7 +1143,7 @@ def flat_deps(services, with_extends=False):
         for c in links_ls:
             if ":" in c:
                 dep_name, dep_alias = c.split(":")
-                if not "_aliases" in services[dep_name]:
+                if "_aliases" not in services[dep_name]:
                     services[dep_name]["_aliases"] = set()
                 services[dep_name]["_aliases"].add(dep_alias)
     for name, srv in services.items():
@@ -1156,7 +1156,7 @@ def flat_deps(services, with_extends=False):
 
 
 class Podman:
-    def __init__(self, compose, podman_path="podman", dry_run=False):
+    def __init__(self, compose: "PodmanCompose", podman_path="podman", dry_run=False):
         self.compose = compose
         self.podman_path = podman_path
         self.dry_run = dry_run
@@ -1641,7 +1641,7 @@ class PodmanCompose:
         if not project_name:
             project_name = compose.get("name", None)
             if project_name is None:
-                # More strict then actually needed for simplicity: podman requires [a-zA-Z0-9][a-zA-Z0-9_.-]*
+                # More strict than actually needed for simplicity: podman requires [a-zA-Z0-9][a-zA-Z0-9_.-]*
                 project_name = (
                     self.environ.get("COMPOSE_PROJECT_NAME", None)
                     or dir_basename.lower()
@@ -1910,7 +1910,7 @@ podman_compose = PodmanCompose()
 
 
 class cmd_run:  # pylint: disable=invalid-name,too-few-public-methods
-    def __init__(self, compose, cmd_name, cmd_desc=None):
+    def __init__(self, compose: PodmanCompose, cmd_name, cmd_desc=None):
         self.compose = compose
         self.cmd_name = cmd_name
         self.cmd_desc = cmd_desc
@@ -1928,7 +1928,7 @@ class cmd_run:  # pylint: disable=invalid-name,too-few-public-methods
 
 
 class cmd_parse:  # pylint: disable=invalid-name,too-few-public-methods
-    def __init__(self, compose, cmd_names):
+    def __init__(self, compose: PodmanCompose, cmd_names):
         self.compose = compose
         self.cmd_names = cmd_names if is_list(cmd_names) else [cmd_names]
 
@@ -1947,7 +1947,7 @@ class cmd_parse:  # pylint: disable=invalid-name,too-few-public-methods
 
 
 @cmd_run(podman_compose, "version", "show version")
-def compose_version(compose, args):
+def compose_version(compose: PodmanCompose, args: argparse.Namespace):
     if getattr(args, "short", False):
         print(__version__)
         return
@@ -1972,7 +1972,9 @@ def is_local(container: dict) -> bool:
 
 
 @cmd_run(podman_compose, "wait", "wait running containers to stop")
-def compose_wait(compose, args):  # pylint: disable=unused-argument
+def compose_wait(
+    compose: PodmanCompose, args: argparse.Namespace
+):  # pylint: disable=unused-argument
     containers = [cnt["name"] for cnt in compose.containers]
     cmd_args = ["--"]
     cmd_args.extend(containers)
@@ -1980,7 +1982,7 @@ def compose_wait(compose, args):  # pylint: disable=unused-argument
 
 
 @cmd_run(podman_compose, "systemd")
-def compose_systemd(compose, args):
+def compose_systemd(compose: PodmanCompose, args: argparse.Namespace):
     """
     create systemd unit file and register its compose stacks
 
@@ -1991,7 +1993,7 @@ def compose_systemd(compose, args):
     stacks_dir = ".config/containers/compose/projects"
     if args.action == "register":
         proj_name = compose.project_name
-        fn = os.path.expanduser(f"~/{stacks_dir}/{proj_name}.env")
+        fn = os.path.expanduser(f"~/{stacks_dir}/{proj_name}profile.env")
         os.makedirs(os.path.dirname(fn), exist_ok=True)
         print(f"writing [{fn}]: ...")
         with open(fn, "w", encoding="utf-8") as f:
@@ -2025,7 +2027,7 @@ you can use podman commands like:
 """
         )
     elif args.action in ("list", "ls"):
-        ls = glob.glob(os.path.expanduser(f"~/{stacks_dir}/*.env"))
+        ls = glob.glob(os.path.expanduser(f"~/{stacks_dir}/*profile.env"))
         for i in ls:
             print(os.path.basename(i[:-4]))
     elif args.action == "create-unit":
@@ -2063,7 +2065,7 @@ while in your project type `podman-compose systemd -a register`
 
 
 @cmd_run(podman_compose, "pull", "pull stack images")
-def compose_pull(compose, args):
+def compose_pull(compose: PodmanCompose, args: argparse.Namespace):
     img_containers = [cnt for cnt in compose.containers if "image" in cnt]
     if args.services:
         services = set(args.services)
@@ -2077,7 +2079,7 @@ def compose_pull(compose, args):
 
 
 @cmd_run(podman_compose, "push", "push stack images")
-def compose_push(compose, args):
+def compose_push(compose: PodmanCompose, args: argparse.Namespace):
     services = set(args.services)
     for cnt in compose.containers:
         if "build" not in cnt:
@@ -2087,7 +2089,7 @@ def compose_push(compose, args):
         compose.podman.run([], "push", [cnt["image"]], sleep=0)
 
 
-def build_one(compose, args, cnt):
+def build_one(compose: PodmanCompose, args: argparse.Namespace, cnt):
     if "build" not in cnt:
         return None
     if getattr(args, "if_not_exists", None):
@@ -2153,7 +2155,7 @@ def build_one(compose, args, cnt):
 
 
 @cmd_run(podman_compose, "build", "build stack images")
-def compose_build(compose, args):
+def compose_build(compose: PodmanCompose, args: argparse.Namespace):
     # keeps the status of the last service/container built
     status = 0
 
@@ -2181,7 +2183,9 @@ def compose_build(compose, args):
     return status
 
 
-def create_pods(compose, args):  # pylint: disable=unused-argument
+def create_pods(
+    compose: PodmanCompose, args: argparse.Namespace
+):  # pylint: disable=unused-argument
     for pod in compose.pods:
         podman_args = [
             "create",
@@ -2199,7 +2203,7 @@ def create_pods(compose, args):  # pylint: disable=unused-argument
         compose.podman.run([], "pod", podman_args)
 
 
-def get_excluded(compose, args):
+def get_excluded(compose: PodmanCompose, args: argparse.Namespace):
     excluded = set()
     if args.services:
         excluded = set(compose.services)
@@ -2213,7 +2217,7 @@ def get_excluded(compose, args):
 @cmd_run(
     podman_compose, "up", "Create and start the entire stack or some of its services"
 )
-def compose_up(compose, args):
+def compose_up(compose: PodmanCompose, args: argparse.Namespace):
     proj_name = compose.project_name
     excluded = get_excluded(compose, args)
     if not args.no_build:
@@ -2314,7 +2318,7 @@ def compose_up(compose, args):
             threads.remove(thread)
 
 
-def get_volume_names(compose, cnt):
+def get_volume_names(compose: PodmanCompose, cnt):
     proj_name = compose.project_name
     basedir = compose.dirname
     srv_name = cnt["_service"]
@@ -2332,7 +2336,7 @@ def get_volume_names(compose, cnt):
 
 
 @cmd_run(podman_compose, "down", "tear down entire stack")
-def compose_down(compose, args):
+def compose_down(compose: PodmanCompose, args: argparse.Namespace):
     excluded = get_excluded(compose, args)
     podman_args = []
     timeout_global = getattr(args, "timeout", None)
@@ -2392,7 +2396,7 @@ def compose_down(compose, args):
 
 
 @cmd_run(podman_compose, "ps", "show status of containers")
-def compose_ps(compose, args):
+def compose_ps(compose: PodmanCompose, args: argparse.Namespace):
     proj_name = compose.project_name
     if args.quiet is True:
         compose.podman.run(
@@ -2417,7 +2421,7 @@ def compose_ps(compose, args):
     "run",
     "create a container similar to a service to run a one-off command",
 )
-def compose_run(compose, args):
+def compose_run(compose: PodmanCompose, args: argparse.Namespace):
     create_pods(compose, args)
     compose.assert_services(args.service)
     container_names = compose.container_names_by_service[args.service]
@@ -2493,7 +2497,7 @@ def compose_run(compose, args):
 
 
 @cmd_run(podman_compose, "exec", "execute a command in a running container")
-def compose_exec(compose, args):
+def compose_exec(compose: PodmanCompose, args: argparse.Namespace):
     compose.assert_services(args.service)
     container_names = compose.container_names_by_service[args.service]
     container_name = container_names[args.index - 1]
@@ -2522,7 +2526,7 @@ def compose_exec(compose, args):
     sys.exit(p.returncode)
 
 
-def transfer_service_status(compose, args, action):
+def transfer_service_status(compose: PodmanCompose, args: argparse.Namespace, action):
     # TODO: handle dependencies, handle creations
     container_names_by_service = compose.container_names_by_service
     if not args.services:
@@ -2552,22 +2556,22 @@ def transfer_service_status(compose, args, action):
 
 
 @cmd_run(podman_compose, "start", "start specific services")
-def compose_start(compose, args):
+def compose_start(compose: PodmanCompose, args: argparse.Namespace):
     transfer_service_status(compose, args, "start")
 
 
 @cmd_run(podman_compose, "stop", "stop specific services")
-def compose_stop(compose, args):
+def compose_stop(compose: PodmanCompose, args: argparse.Namespace):
     transfer_service_status(compose, args, "stop")
 
 
 @cmd_run(podman_compose, "restart", "restart specific services")
-def compose_restart(compose, args):
+def compose_restart(compose: PodmanCompose, args: argparse.Namespace):
     transfer_service_status(compose, args, "restart")
 
 
 @cmd_run(podman_compose, "logs", "show logs from services")
-def compose_logs(compose, args):
+def compose_logs(compose: PodmanCompose, args: argparse.Namespace):
     container_names_by_service = compose.container_names_by_service
     if not args.services and not args.latest:
         args.services = container_names_by_service.keys()
@@ -2598,7 +2602,7 @@ def compose_logs(compose, args):
 
 
 @cmd_run(podman_compose, "config", "displays the compose file")
-def compose_config(compose, args):
+def compose_config(compose: PodmanCompose, args: argparse.Namespace):
     if args.services:
         for service in compose.services:
             print(service)
@@ -2607,7 +2611,7 @@ def compose_config(compose, args):
 
 
 @cmd_run(podman_compose, "port", "Prints the public port for a port binding.")
-def compose_port(compose, args):
+def compose_port(compose: PodmanCompose, args: argparse.Namespace):
     # TODO - deal with pod index
     compose.assert_services(args.service)
     containers = compose.container_names_by_service[args.service]
@@ -2635,7 +2639,7 @@ def compose_port(compose, args):
 
 
 @cmd_run(podman_compose, "pause", "Pause all running containers")
-def compose_pause(compose, args):
+def compose_pause(compose: PodmanCompose, args: argparse.Namespace):
     container_names_by_service = compose.container_names_by_service
     if not args.services:
         args.services = container_names_by_service.keys()
@@ -2646,7 +2650,7 @@ def compose_pause(compose, args):
 
 
 @cmd_run(podman_compose, "unpause", "Unpause all running containers")
-def compose_unpause(compose, args):
+def compose_unpause(compose: PodmanCompose, args: argparse.Namespace):
     container_names_by_service = compose.container_names_by_service
     if not args.services:
         args.services = container_names_by_service.keys()
@@ -2659,7 +2663,7 @@ def compose_unpause(compose, args):
 @cmd_run(
     podman_compose, "kill", "Kill one or more running containers with a specific signal"
 )
-def compose_kill(compose, args):
+def compose_kill(compose: PodmanCompose, args: argparse.Namespace):
     # to ensure that the user did not execute the command by mistake
     if not args.services and not args.all:
         print(
@@ -2696,7 +2700,7 @@ def compose_kill(compose, args):
     "stats",
     "Display percentage of CPU, memory, network I/O, block I/O and PIDs for services.",
 )
-def compose_stats(compose, args):
+def compose_stats(compose: PodmanCompose, args: argparse.Namespace):
     container_names_by_service = compose.container_names_by_service
     if not args.services:
         args.services = container_names_by_service.keys()
